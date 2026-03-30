@@ -1,4 +1,5 @@
 use num_enum::TryFromPrimitive;
+use std::env::{self, args};
 use std::io::{self, Write};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -174,21 +175,93 @@ fn format_result(n: f64) -> String {
     s.to_string()
 }
 
-fn main() {
-    let property: Property = ask_property();
-
-    let from_unit: Unit = ask_unit(&property, Direction::From);
-    let to_unit: Unit = ask_unit(&property, Direction::To);
-
-    let quantity = ask_quantity(&from_unit);
-
+fn convert(quantity: f64, from_unit: Unit, to_unit: Unit) {
     let base = (quantity + from_unit.offset) * from_unit.to_base;
     let result = base / to_unit.to_base - to_unit.offset;
 
     println!(
-        "{quantity} {} is equal to {} {}",
+        "{quantity} {} ({}) is equal to {} {} ({})",
         from_unit.symbol,
+        from_unit.name,
         format_result(result),
-        to_unit.symbol
+        to_unit.symbol,
+        to_unit.name,
+    );
+}
+
+fn bad_argument() {
+    println!(
+        "\"cvrt {:?}\" is not a known function. Try \"cvrt help\" for more information",
+        env::args()
+    );
+}
+
+fn main() {
+    //let args : Vec<String> = env::args().collect();
+    let mut arguments = vec![];
+    for (i, argument) in env::args().enumerate() {
+        if i == 0 {
+            continue;
+        }
+        arguments.push(argument);
+    }
+
+    if arguments.len() == 0 {
+        let property: Property = ask_property();
+        let from_unit: Unit = ask_unit(&property, Direction::From);
+        let to_unit: Unit = ask_unit(&property, Direction::To);
+        let quantity = ask_quantity(&from_unit);
+
+        convert(quantity, from_unit, to_unit);
+        return;
+    }
+
+    if arguments[0] == "help" {
+        println!();
+        println!("cvrt is a simple CLI unit converter utility");
+        println!();
+        println!("Usage:   cvrt [unit in]>[unit out] [quantity]");
+        println!();
+        println!("Example: cvrt kg>lb 95");
+        println!("\n or try cvrt without any arguments\n for a step-by-step conversion");
+        println!();
+        println!("See \"cvrt units\" for a full list of what cvrt can do");
+        return;
+    }
+
+    if arguments.len() != 2 {
+        bad_argument();
+    }
+
+    let units: &Vec<&str> = &arguments[0].split(">").collect();
+    let quantity: f64 = arguments[1].parse().ok().expect("Quantity should be a number");
+
+    let mut from_unit: Option<&Unit> = None;
+    let mut to_unit: Option<&Unit> = None;
+
+    for property in Property::iter() {
+        let from = property
+            .units()
+            .iter()
+            .find(|u| u.cli_key.unwrap_or(u.symbol).to_lowercase() == units[0]);
+        if from.is_some() {
+            from_unit = from;
+            break;
+        }
+    }
+    for property in Property::iter() {
+        let to = property
+            .units()
+            .iter()
+            .find(|u| u.cli_key.unwrap_or(u.symbol).to_lowercase() == units[1]);
+        if to.is_some() {
+            to_unit = to;
+            break;
+        }
+    }
+    convert(
+        quantity,
+        from_unit.expect("Invalid conversion from unit").clone(),
+        to_unit.expect("Invalid conversion to unit").clone()
     );
 }

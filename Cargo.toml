@@ -1,5 +1,5 @@
 [package]
-name = "unit-converter"
+name = "cvrt"
 version = "0.1.0"
 edition = "2024"
 
